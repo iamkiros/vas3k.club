@@ -35,6 +35,16 @@ def ceil(value):
 
 
 @register.filter
+def lookup(obj, key):
+    return obj.get(key)
+
+
+@register.filter
+def floor(value):
+    return math.floor(value or 0)
+
+
+@register.filter
 def cool_number(value, num_decimals=1):
     """
     11500 -> 11.5K, etc
@@ -44,9 +54,9 @@ def cool_number(value, num_decimals=1):
     if int_value < 1000:
         return str(int_value)
     elif int_value < 1000000:
-        return formatted_number.format(int_value / 1000.0).rstrip("0.") + "K"
+        return formatted_number.format(int_value / 1000.0).rstrip("0").rstrip(".") + "K"
     else:
-        return formatted_number.format(int_value / 1000000.0).rstrip("0.") + "M"
+        return formatted_number.format(int_value / 1000000.0).rstrip("0").rstrip(".") + "M"
 
 
 @register.filter
@@ -80,7 +90,7 @@ def percentage_of(value, arg):
 @register.filter
 def rupluralize(value, arg="дурак,дурака,дураков"):
     args = arg.split(",")
-    number = abs(int(value))
+    number = abs(int(value or 0))
     a = number % 10
     b = number % 100
 
@@ -95,6 +105,7 @@ def rupluralize(value, arg="дурак,дурака,дураков"):
 @register.filter
 def rutypography(value):
     return ru_typus(value)
+
 
 @register.filter
 def uncapitalize(value):
@@ -129,10 +140,25 @@ def resized_image(value, arg="full"):
 def youtube_id(value):
     youtube_match = YOUTUBE_RE.match(value)
     if youtube_match:
-        return youtube_match.group(1)
+        return youtube_match.group(1) or ""
     return ""
 
 
 @register.filter()
 def jsonify(value):
     return json.dumps(value)
+
+
+@register.filter()
+def days_to_weeks(days):
+    return days // 7
+
+
+@register.filter()
+def days_to_months(days):
+    return days // 30.5
+
+
+@register.filter()
+def days_to_years(days):
+    return days // 365

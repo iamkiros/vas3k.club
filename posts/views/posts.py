@@ -1,10 +1,13 @@
 from django.conf import settings
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_http_methods
 
-from auth.helpers import check_user_permissions, auth_required
+from authn.helpers import check_user_permissions
+from authn.decorators.auth import require_auth
 from club.exceptions import AccessDenied, ContentDuplicated, RateLimitException
-from common.request import ajax_request
+from authn.decorators.api import api
 from posts.forms.compose import POST_TYPE_MAP, PostTextForm
 from posts.models.linked import LinkedPost
 from posts.models.post import Post
@@ -22,16 +25,15 @@ def show_post(request, post_type, post_slug):
     if post.type != post_type:
         return redirect("show_post", post.type, post.slug)
 
+    # drafts are visible only to authors, coauthors and moderators
+    if not post.can_view(request.me):
+        raise Http404()
+
     # don't show private posts into public
     if not post.is_public:
         access_denied = check_user_permissions(request, post=post)
         if access_denied:
             return access_denied
-
-    # drafts are visible only to authors and moderators
-    if not post.is_visible:
-        if not request.me or (request.me != post.author and not request.me.is_moderator):
-            raise Http404()
 
     # record a new view
     last_view_at = None
@@ -63,7 +65,7 @@ def show_post(request, post_type, post_slug):
     })
 
 
-@auth_required
+@require_auth
 def unpublish_post(request, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
     if not request.me.is_moderator:
@@ -82,7 +84,7 @@ def unpublish_post(request, post_slug):
     return redirect("show_post", post.type, post.slug)
 
 
-@auth_required
+@require_auth
 def clear_post(request, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
     if post.author != request.me and not request.me.is_moderator:
@@ -93,7 +95,7 @@ def clear_post(request, post_slug):
     return redirect("show_post", post.type, post.slug)
 
 
-@auth_required
+@require_auth
 def delete_post(request, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
     if post.author != request.me:
@@ -109,12 +111,9 @@ def delete_post(request, post_slug):
     return redirect("compose")
 
 
-@auth_required
-@ajax_request
+@api(require_auth=True)
+@require_http_methods(["POST"])
 def upvote_post(request, post_slug):
-    if request.method != "POST":
-        raise Http404()
-
     post = get_object_or_404(Post, slug=post_slug)
 
     post_vote, is_vote_created = PostVote.upvote(
@@ -127,16 +126,13 @@ def upvote_post(request, post_slug):
         "post": {
             "upvotes": post.upvotes + (1 if is_vote_created else 0),
         },
-        "upvoted_timestamp": int(post_vote.created_at.timestamp() * 1000)
+        "upvoted_timestamp": int(post_vote.created_at.timestamp() * 1000) if post_vote else 0
     }
 
 
-@auth_required
-@ajax_request
+@api(require_auth=True)
+@require_http_methods(["POST"])
 def retract_post_vote(request, post_slug):
-    if request.method != "POST":
-        raise Http404()
-
     post = get_object_or_404(Post, slug=post_slug)
 
     is_retracted = PostVote.retract_vote(
@@ -153,36 +149,41 @@ def retract_post_vote(request, post_slug):
     }
 
 
-@auth_required
-@ajax_request
+@api(require_auth=True)
+@require_http_methods(["POST"])
 def toggle_post_subscription(request, post_slug):
-    if request.method != "POST":
-        raise Http404()
-
     post = get_object_or_404(Post, slug=post_slug)
 
-    subscription, is_created = PostSubscription.objects.get_or_create(
+    subscription, is_created = PostSubscription.subscribe(
         user=request.me,
         post=post,
+        type=PostSubscription.TYPE_TOP_LEVEL_ONLY,
     )
 
     if not is_created:
-        subscription.delete()
+        # already exist? remove it
+        PostSubscription.unsubscribe(
+            user=request.me,
+            post=post,
+        )
 
     return {
         "status": "created" if is_created else "deleted"
     }
 
 
-@auth_required
+@require_auth
 def compose(request):
-    drafts = Post.objects.filter(author=request.me, is_visible=False, deleted_at__isnull=True)[:100]
+    drafts = Post.objects\
+        .filter(is_visible=False, deleted_at__isnull=True)\
+        .filter(Q(author=request.me) | Q(coauthors__contains=[request.me.slug]))[:100]
+
     return render(request, "posts/compose/compose.html", {
         "drafts": drafts
     })
 
 
-@auth_required
+@require_auth
 def compose_type(request, post_type):
     if post_type not in dict(Post.TYPES):
         raise Http404()
@@ -190,10 +191,10 @@ def compose_type(request, post_type):
     return create_or_edit(request, post_type, mode="create")
 
 
-@auth_required
+@require_auth
 def edit_post(request, post_slug):
     post = get_object_or_404(Post, slug=post_slug)
-    if post.author != request.me and not request.me.is_moderator:
+    if not post.can_edit(request.me):
         raise AccessDenied()
 
     return create_or_edit(request, post.type, post=post, mode="edit")
@@ -207,13 +208,14 @@ def create_or_edit(request, post_type, post=None, mode="create"):
         form = FormClass(instance=post)
         return render(request, f"posts/compose/{post_type}.html", {
             "mode": mode,
-            "form": form
+            "post_type": post_type,
+            "form": form,
         })
 
     # validate form on POST
     form = FormClass(request.POST, request.FILES, instance=post)
     if form.is_valid():
-        if not request.me.is_moderator:
+        if (post and post.type != Post.TYPE_INTRO) and not request.me.is_moderator:
             if Post.check_duplicate(
                 user=request.me,
                 title=form.cleaned_data["title"],
@@ -235,12 +237,12 @@ def create_or_edit(request, post_type, post=None, mode="create"):
         post.html = None  # flush cache
         post.save()
 
-        if mode == "create":
-            PostSubscription.subscribe(request.me, post)
+        if mode == "create" or not post.is_visible:
+            PostSubscription.subscribe(request.me, post, type=PostSubscription.TYPE_ALL_COMMENTS)
 
         if post.is_visible:
-            if post.topic:
-                post.topic.update_last_activity()
+            if post.room:
+                post.room.update_last_activity()
 
             SearchIndex.update_post_index(post)
             LinkedPost.create_links_from_text(post, post.text)
@@ -248,13 +250,12 @@ def create_or_edit(request, post_type, post=None, mode="create"):
         action = request.POST.get("action")
         if action == "publish":
             post.publish()
+            LinkedPost.create_links_from_text(post, post.text)
 
-        if post.is_visible or action == "preview":
-            return redirect("show_post", post.type, post.slug)
-        else:
-            return redirect("compose")
+        return redirect("show_post", post.type, post.slug)
 
     return render(request, f"posts/compose/{post_type}.html", {
         "mode": mode,
-        "form": form
+        "post_type": post_type,
+        "form": form,
     })

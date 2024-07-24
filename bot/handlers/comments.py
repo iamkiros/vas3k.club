@@ -4,15 +4,16 @@ from django.urls import reverse
 from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
 
-from bot.handlers.common import get_club_user, COMMENT_REPLY_RE, POST_COMMENT_RE, get_club_comment, get_club_post
+from bot.handlers.common import get_club_user, COMMENT_EMOJI_RE, POST_EMOJI_RE, get_club_comment, get_club_post
 from bot.decorators import is_club_member
 from club import settings
 from comments.models import Comment
 from posts.models.post import Post
+from posts.models.linked import LinkedPost
 
 log = logging.getLogger(__name__)
 
-MIN_COMMENT_LEN = 200
+MIN_COMMENT_LEN = 40
 
 
 def comment(update: Update, context: CallbackContext) -> None:
@@ -23,10 +24,10 @@ def comment(update: Update, context: CallbackContext) -> None:
 
     reply_text_start = update.message.reply_to_message.text[:10]
 
-    if COMMENT_REPLY_RE.match(reply_text_start):
+    if COMMENT_EMOJI_RE.match(reply_text_start):
         return reply_to_comment(update, context)
 
-    if POST_COMMENT_RE.match(reply_text_start):
+    if POST_EMOJI_RE.match(reply_text_start):
         return comment_to_post(update, context)
 
     # skip normal replies
@@ -107,7 +108,11 @@ def comment_to_post(update: Update, context: CallbackContext) -> None:
             f"😣 Сорян, я пока умею только в текстовые реплаи"
         )
         return None
-
+        
+    for skip_word in ("/skip","#skip","#ignore"):
+        if skip_word in text:
+            return None
+            
     if len(text) < MIN_COMMENT_LEN:
         update.message.reply_text(
             f"😋 Твой коммент слишком короткий. Не буду постить его в Клуб, пускай остается в чате"
@@ -123,6 +128,8 @@ def comment_to_post(update: Update, context: CallbackContext) -> None:
             "telegram": update.to_dict()
         }
     )
+    LinkedPost.create_links_from_text(post, text)
+
     new_comment_url = settings.APP_HOST + reverse("show_comment", kwargs={
         "post_slug": reply.post.slug,
         "comment_id": reply.id

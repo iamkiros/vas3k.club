@@ -6,7 +6,7 @@ from django.http import Http404
 from django.shortcuts import redirect, get_object_or_404, render
 from django_q.tasks import async_task
 
-from auth.helpers import auth_required
+from authn.decorators.auth import require_auth
 from gdpr.archive import generate_data_archive
 from gdpr.models import DataRequests
 from search.models import SearchIndex
@@ -16,9 +16,9 @@ from users.models.user import User
 from utils.strings import random_hash
 
 
-@auth_required
+@require_auth
 def profile_settings(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("profile_settings", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -28,9 +28,9 @@ def profile_settings(request, user_slug):
     return render(request, "users/edit/index.html", {"user": user})
 
 
-@auth_required
+@require_auth
 def edit_profile(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_profile", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -44,18 +44,16 @@ def edit_profile(request, user_slug):
             user.save()
 
             SearchIndex.update_user_index(user)
-            Geo.update_for_user(user)
-
-            return redirect("profile", user.slug)
+            Geo.update_for_user(user, fuzzy=True)
     else:
         form = ProfileEditForm(instance=user)
 
     return render(request, "users/edit/profile.html", {"form": form, "user": user})
 
 
-@auth_required
+@require_auth
 def edit_account(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_account", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -70,9 +68,9 @@ def edit_account(request, user_slug):
     return render(request, "users/edit/account.html", {"user": user})
 
 
-@auth_required
+@require_auth
 def edit_notifications(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_notifications", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -91,9 +89,9 @@ def edit_notifications(request, user_slug):
     return render(request, "users/edit/notifications.html", {"form": form, "user": user})
 
 
-@auth_required
+@require_auth
 def edit_payments(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_payments", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -109,13 +107,16 @@ def edit_payments(request, user_slug):
 
     subscriptions = []
     if user.stripe_id:
-        stripe_subscriptions = stripe.Subscription.list(customer=user.stripe_id, limit=100)
-        subscriptions = [dict(
-            id=s["id"],
-            next_charge_at=datetime.utcfromtimestamp(s["current_period_end"]),
-            amount=int(s["plan"]["amount"] / 100),
-            interval=s["plan"]["interval"],
-        ) for s in stripe_subscriptions["data"]]
+        try:
+            stripe_subscriptions = stripe.Subscription.list(customer=user.stripe_id, limit=100)
+            subscriptions = [dict(
+                id=s["id"],
+                next_charge_at=datetime.utcfromtimestamp(s["current_period_end"]),
+                amount=int(s["plan"]["amount"] / 100),
+                interval=s["plan"]["interval"],
+            ) for s in stripe_subscriptions["data"]]
+        except (stripe.error.InvalidRequestError, stripe.error.AuthenticationError):
+            subscriptions = []
 
     return render(request, "users/edit/payments.html", {
         "user": user,
@@ -124,9 +125,9 @@ def edit_payments(request, user_slug):
     })
 
 
-@auth_required
+@require_auth
 def edit_bot(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_bot", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -136,9 +137,9 @@ def edit_bot(request, user_slug):
     return render(request, "users/edit/bot.html", {"user": user})
 
 
-@auth_required
+@require_auth
 def edit_data(request, user_slug):
-    if user_slug == "me":
+    if user_slug == "me" and request.me:
         return redirect("edit_data", request.me.slug, permanent=False)
 
     user = get_object_or_404(User, slug=user_slug)
@@ -148,7 +149,7 @@ def edit_data(request, user_slug):
     return render(request, "users/edit/data.html", {"user": user})
 
 
-@auth_required
+@require_auth
 def request_data(request, user_slug):
     if request.method != "POST":
         return redirect("edit_data", user_slug, permanent=False)

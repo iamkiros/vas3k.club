@@ -1,7 +1,10 @@
+from urllib.parse import urlencode
+
 from django import template
 from django.conf import settings
 from django.template import loader
 from django.template.defaultfilters import truncatechars
+from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 
@@ -53,6 +56,16 @@ def render_plain(context, post, truncate=None):
 
 
 @register.simple_tag()
+def feed_ordering_url(room, label_code, post_type, ordering_type):
+    if room:
+        return reverse("feed_room_ordering", args=[room.slug, ordering_type])
+    elif label_code:
+        return reverse("feed_label_ordering", args=[label_code, ordering_type])
+    else:
+        return reverse("feed_ordering", args=[post_type, ordering_type])
+
+
+@register.simple_tag()
 def link_icon(post):
     if post.metadata:
         if post.metadata.get("domain") in CUSTOM_ICONS:
@@ -70,7 +83,7 @@ summary_template = loader.get_template("posts/embeds/summary.html")
 
 @register.simple_tag()
 def link_summary(post):
-    if not post.metadata or not post.metadata.get("title") or not post.metadata.get("url"):
+    if not post.metadata or not any(map(post.metadata.get, ['title', 'url', 'description'])):
         return ""
 
     embed = ""
@@ -87,10 +100,31 @@ def link_summary(post):
 
 
 @register.filter
-def can_upvote(user, post_or_comment):
-    return bool(user and user != post_or_comment.author)
+def can_upvote_post(user, post):
+    return bool(user and user.is_active_membership and user != post.author and user.slug not in post.coauthors)
 
 
 @register.filter
-def any_image(post, default="/static/images/share.png"):
-    return extract_any_image(post) or default
+def can_upvote_comment(user, comment):
+    return bool(user and user.is_active_membership and user != comment.author)
+
+
+@register.filter
+def any_image(post):
+    return extract_any_image(post) or settings.OG_IMAGE_DEFAULT
+
+
+@register.simple_tag()
+def og_image(post):
+    if not settings.OG_IMAGE_GENERATOR_URL:
+        return any_image(post)
+
+    params = urlencode({
+        **settings.OG_IMAGE_GENERATOR_DEFAULTS,
+        "title": f"{post.prefix} {post.title}" if post.prefix else post.title,
+        "author": post.author.slug,
+        "ava": post.author.get_avatar(),
+        "bg": extract_any_image(post) or "#FFFFFF"
+    })
+
+    return f"{settings.OG_IMAGE_GENERATOR_URL}?{params}"

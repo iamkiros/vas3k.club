@@ -15,13 +15,11 @@
         {% if mode == "create" %}
             <div class="content-description">
                 <p>
-                    Идеи без реализации ничего не стоят. Потому умные люди придумали ими делиться.
-                    Ведь тогда в хаосе мыслей могут появиться единомышленники и получиться что-то новое и крутое.
+                    Делимся идеями, которые засели в голове или желаниями «вот бы был такой сервис, чтобы...»
                 </p>
 
                 <p>
-                    Зачастую идея — это лишь наша интерпретация событий.
-                    Потому мы рекомендуем рассказывать не только саму суть, а начать с реальных историй, людей и проблем, которые натолкнули вас на эту идею.
+                    У людей часто появляются одинаковые идеи и только поделившись ими можно найти единомышленников.
                 </p>
             </div>
         {% endif %}
@@ -38,8 +36,8 @@
                 <div class="form-row compose-form-text">
                     <label for="{{ form.text.id_for_label }}" class="form-label">{{ form.text.label }}</label>
                     {{ form.text }}
-                    {% if form.title.errors %}<span class="compose-form-errors">{{ form.title.errors }}</span>{% endif %}
-                    <span class="form-row-help form-row-help-wide">Можно использовать <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a></span>
+                    {% if form.text.errors %}<span class="compose-form-errors">{{ form.text.errors }}</span>{% endif %}
+                    <span class="form-row-help form-row-help-wide">Можно использовать <a href="https://doka.guide/tools/markdown/" target="_blank">Markdown</a></span>
                 </div>
 
                 {% include "posts/compose/elements/post_settings.html" %}

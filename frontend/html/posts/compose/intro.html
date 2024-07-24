@@ -28,9 +28,9 @@
                 <div class="form-row compose-form-text">
                     <label for="{{ form.text.id_for_label }}" class="form-label">Текст интро</label>
                     {{ form.text }}
-                    {% if form.title.errors %}<span class="compose-form-errors">{{ form.title.errors }}</span>{% endif %}
+                    {% if form.text.errors %}<span class="compose-form-errors">{{ form.text.errors }}</span>{% endif %}
                     <span class="form-row-help form-row-help-wide">
-                        Можно использовать <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a>.
+                        Можно использовать <a href="https://doka.guide/tools/markdown/" target="_blank">Markdown</a>.
                         Для загрузки картинок просто перетащите их в редактор.
                     </span>
                 </div>
@@ -38,7 +38,7 @@
                 <div class="form-row compose-form-text">
                     <div class="block form-warning">
                         ⚠️ После изменения интро оно снова попадет на ревью к нашим модераторам.
-                        Вам не придётся ждать модерации, однако если ваше интро вдруг перестанет соответствовать нашим стандартам качества — вас отправят проходить её повторно.
+                        Вам не придётся ждать модерации, однако если ваше интро вдруг перестанет соответствовать нашим стандартам качества — вас отправят проходить модерацию повторно.
                     </div>
                 </div>
 

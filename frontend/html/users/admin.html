@@ -31,6 +31,83 @@
                     {% if info_form.email.errors %}<span class="form-row-errors">{{ info_form.email.errors }}</span>{% endif %}
                 </div>
 
+                <div class="form-row form-row-right">
+                    {{ info_form.company.label_tag }}
+                    {{ info_form.company }}
+                    {% if info_form.company.errors %}<span class="form-row-errors">{{ info_form.company.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row form-row-right">
+                    {{ info_form.position.label_tag }}
+                    {{ info_form.position }}
+                    {% if info_form.position.errors %}<span class="form-row-errors">{{ info_form.position.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row form-row-right">
+                    {{ info_form.contact.label_tag }}
+                    {{ info_form.contact }}
+                    {% if info_form.contact.errors %}<span class="form-row-errors">{{ info_form.contact.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.membership_platform_type.label_tag }}
+                    {{ info_form.membership_platform_type }}
+                    {% if info_form.membership_platform_type.errors %}<span class="form-row-errors">{{ info_form.membership_platform_type.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.email_digest_type.label_tag }}
+                    {{ info_form.email_digest_type }}
+                    {% if info_form.email_digest_type.errors %}<span class="form-row-errors">{{ info_form.email_digest_type.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.telegram_id.label_tag }}
+                    {{ info_form.telegram_id }}
+                    {% if info_form.telegram_id.errors %}<span class="form-row-errors">{{ info_form.telegram_id.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.stripe_id.label_tag }}
+                    {{ info_form.stripe_id }}
+                    {% if info_form.stripe_id.errors %}<span class="form-row-errors">{{ info_form.stripe_id.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.is_email_verified.label_tag }}
+                    {{ info_form.is_email_verified }}
+                    {% if info_form.is_email_verified.errors %}<span class="form-row-errors">{{ info_form.is_email_verified.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ info_form.is_banned_until.label_tag }}
+                    {{ info_form.is_banned_until }}
+                    {{ info_form.is_banned_until.help_text }}
+                    {% if info_form.is_banned_until.errors %}<span class="form-row-errors">{{ info_form.is_banned_until.errors }}</span>{% endif %}
+                </div>
+
+                <button type="submit" class="button">Сохранить</button>
+            </form>
+        </div>
+
+        <div class="profile-header">Роли</div>
+        <div class="block">
+            <div class="form-row">Роли пользователя: {{ user.get_roles_display }}</div>
+            <form action="." method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    {{ form.role_action.label_tag }}
+                    {{ form.role_action }}
+                    {% if form.role_action.errors %}<span class="form-row-errors">{{ form.role_action.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ form.role.label_tag }}
+                    {{ form.role }}
+                    {% if form.role.errors %}<span class="form-row-errors">{{ form.role.errors }}</span>{% endif %}
+                </div>
+
                 <button type="submit" class="button">Сохранить</button>
             </form>
         </div>
@@ -102,30 +179,107 @@
             </form>
         </div>
 
-        <div class="profile-header">Наказать</div>
+        <div class="profile-header">Забанить временно</div>
+
         <div class="block">
             <form action="." method="post" enctype="multipart/form-data">
                 {% csrf_token %}
 
                 <div class="form-row">
-                    {{ form.is_banned.label_tag }}
-                    {{ form.is_banned }}
-                    {% if form.is_banned.errors %}<span class="form-row-errors">{{ form.is_banned.errors }}</span>{% endif %}
+                    {{ form.is_temporarily_banned.label_tag }}
+                    {{ form.is_temporarily_banned }}
+                    {% if form.is_temporarily_banned.errors %}<span class="form-row-errors">{{ form.is_temporarily_banned.errors }}</span>{% endif %}
                 </div>
 
                 <div class="form-row">
-                    {{ form.ban_reason.label_tag }}
-                    {{ form.ban_reason }}
-                    {% if form.ban_reason.errors %}<span class="form-row-errors">{{ form.ban_reason.errors }}</span>{% endif %}
+                    {{ form.temporary_ban_reason.label_tag }}
+                    {{ form.temporary_ban_reason }}
+                    {% if form.temporary_ban_reason.errors %}<span class="form-row-errors">{{ form.temporary_ban_reason.errors }}</span>{% endif %}
                 </div>
 
                 <div class="form-row">
-                    {{ form.ban_days.label_tag }}
-                    {{ form.ban_days }}
-                    {% if form.ban_days.errors %}<span class="form-row-errors">{{ form.ban_days.errors }}</span>{% endif %}
+                    Количества дней бана начисляется прогрессивно и автоматически по следующей шкале: {{ ban_progression }}<br><br>
+
+                    {% if user.metadata.last_ban %}
+                        ☢️ Пользователь уже был забанен ранее на <strong>{{ user.metadata.last_ban.days }} дней</strong> по причине <strong>«{{ user.metadata.last_ban.reason }}»</strong>, так что ему будет выдано большее по величине количество дней из списка выше (или максимальное).
+                    {% else %}
+                        ☝️ У этого пользователя еще не было банов, так что ему будет выдано минимальное количество дней из описания.
+                    {% endif %}
                 </div>
 
-                <button type="submit" class="button">Забанить</button>
+                <button type="submit" class="button">Забанить временно</button>
+            </form>
+        </div>
+
+        <div class="profile-header">Забанить кастомно</div>
+
+        <div class="block">
+            <form action="." method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    {{ form.is_custom_banned.label_tag }}
+                    {{ form.is_custom_banned }}
+                    {% if form.is_custom_banned.errors %}<span class="form-row-errors">{{ form.is_custom_banned.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ form.custom_ban_name.label_tag }}
+                    {{ form.custom_ban_name }}
+                    {% if form.custom_ban_name.errors %}<span class="form-row-errors">{{ form.custom_ban_name.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ form.custom_ban_reason.label_tag }}
+                    {{ form.custom_ban_reason }}
+                    {% if form.custom_ban_reason.errors %}<span class="form-row-errors">{{ form.custom_ban_reason.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ form.custom_ban_days.label_tag }}
+                    {{ form.custom_ban_days }}
+                    {% if form.custom_ban_days.errors %}<span class="form-row-errors">{{ form.custom_ban_days.errors }}</span>{% endif %}
+                </div>
+
+                <button type="submit" class="button">Забанить кастомно</button>
+            </form>
+        </div>
+
+        <div class="profile-header">Забанить навечно (ОПАСНО)</div>
+
+        <div class="block">
+            <form action="." method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    {{ form.is_permanently_banned.label_tag }}
+                    {{ form.is_permanently_banned }}
+                    {% if form.is_permanently_banned.errors %}<span class="form-row-errors">{{ form.is_permanently_banned.errors }}</span>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    {{ form.permanent_ban_reason.label_tag }}
+                    {{ form.permanent_ban_reason }}
+                    {% if form.permanent_ban_reason.errors %}<span class="form-row-errors">{{ form.permanent_ban_reason.errors }}</span>{% endif %}
+                </div>
+
+                <button type="submit" class="button" onclick="return confirm('Точно баним юзера навсегда?')">Забанить навечно</button>
+            </form>
+        </div>
+
+        <div class="profile-header">Разбанить</div>
+
+        <div class="block">
+            <form action="." method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    {{ form.is_unbanned.label_tag }}
+                    {{ form.is_unbanned }}
+                    {% if form.is_unbanned.errors %}<span class="form-row-errors">{{ form.is_unbanned.errors }}</span>{% endif %}
+                </div>
+
+                <button type="submit" class="button">Разбанить юзера</button>
             </form>
         </div>
 
@@ -159,6 +313,20 @@
                 </form>
             </div>
         {% endif %}
+
+        <div class="profile-header">Продлить членство</div>
+        <div class="block">
+            <form action="." method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    {{ form.add_membership_days.label_tag }}
+                    {{ form.add_membership_days }}
+                    {% if form.add_membership_days.errors %}<span class="form-row-errors">{{ form.add_membership_days.errors }}</span>{% endif %}
+                </div>
+                <button type="submit" class="button">Добавить дней</button>
+            </form>
+        </div>
 
         <div class="profile-header">Отправить сообщение</div>
         <div class="block">

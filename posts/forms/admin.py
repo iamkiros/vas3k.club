@@ -4,7 +4,7 @@ from common.data.labels import LABELS
 from posts.models.post import Post
 
 
-class PostAdminForm(forms.Form):
+class PostCuratorForm(forms.Form):
     change_type = forms.ChoiceField(
         label="Сменить тип поста",
         choices=[(None, "---")] + Post.TYPES,
@@ -16,6 +16,7 @@ class PostAdminForm(forms.Form):
         choices=[(None, "---")] + [(key, value.get("title")) for key, value in LABELS.items()],
         required=False,
     )
+
     remove_label = forms.BooleanField(
         label="Удалить текуший лейбл",
         required=False
@@ -25,11 +26,13 @@ class PostAdminForm(forms.Form):
         label="Запинить",
         required=False
     )
+
     pin_days = forms.IntegerField(
         label="На сколько дней пин?",
-        initial=0,
+        initial=1,
         required=False
     )
+
     remove_pin = forms.BooleanField(
         label="Отпинить обратно",
         required=False
@@ -40,23 +43,45 @@ class PostAdminForm(forms.Form):
         required=False
     )
 
+    move_down = forms.BooleanField(
+        label="Опустить на главной",
+        required=False
+    )
+
     shadow_ban = forms.BooleanField(
         label="Шадоу бан (редко!)",
         required=False,
     )
 
-    hide_on_main = forms.BooleanField(
+    hide_from_feeds = forms.BooleanField(
         label="Скрыть с главной",
         required=False,
     )
 
-    close_comments = forms.BooleanField(
-        label="Закрыть комменты",
+    show_in_feeds = forms.BooleanField(
+        label="Вернуть на главную (или вытащить из комнаты)",
+        required=False,
+    )
+
+    re_ping_collectible_tag_owners = forms.BooleanField(
+        label="Перепингануть подписчиков коллективного тега",
+        required=False,
+    )
+
+
+class PostAdminForm(PostCuratorForm):
+    toggle_is_commentable = forms.BooleanField(
+        label="Закрыть комменты (повторный клик переоткроет заново)",
         required=False,
     )
 
     transfer_ownership = forms.CharField(
         label="Передать владение постом другому юзернейму",
+        required=False,
+    )
+
+    refresh_linked = forms.BooleanField(
+        label="Обновить связанные посты",
         required=False,
     )
 

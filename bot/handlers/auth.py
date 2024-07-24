@@ -1,4 +1,5 @@
 from telegram import Update, ParseMode
+from telegram.error import Unauthorized
 from telegram.ext import CallbackContext
 
 from bot.cache import flush_users_cache, cached_telegram_users
@@ -32,8 +33,15 @@ def command_auth(update: Update, context: CallbackContext) -> None:
     }
     user.save()
 
-    update.effective_chat.send_message(f"Отличный код! Приятно познакомиться, {user.slug}")
+    try:
+        update.effective_chat.send_message(f"Отличный код! Приятно познакомиться, {user.slug}")
+    except Unauthorized:
+        return None
+
     update.message.delete()
+
+    if user.moderation_status != User.MODERATION_STATUS_APPROVED:
+        update.effective_chat.send_message(f"Теперь осталось пройти модерацию. Бот заработает сразу после этого")
 
     # Refresh the cache by deleting and requesting it again
     flush_users_cache()

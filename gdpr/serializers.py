@@ -3,11 +3,13 @@ from typing import List
 from django.conf import settings
 from django.urls import reverse
 
+from badges.models import UserBadge
 from bookmarks.models import PostBookmark
 from comments.models import Comment
 from posts.models.post import Post
-from users.models.expertise import UserExpertise
-from users.models.tags import UserTag
+from posts.models.votes import PostVote
+from users.models.achievements import UserAchievement
+from tags.models import UserTag
 from users.models.user import User
 
 
@@ -21,7 +23,7 @@ def post_to_json(post: Post) -> dict:
         "slug": post.slug,
         "author_id": str(post.author_id),
         "type": post.type,
-        "topic": post.topic.name if post.topic else None,
+        "room": post.room.title if post.room else None,
         "label": post.label,
         "title": post.title,
         "text": post.text,
@@ -119,23 +121,6 @@ def user_tag_to_json(user_tag: UserTag) -> dict:
     }
 
 
-def user_expertises_to_json(user_expertises: List[UserExpertise]) -> dict:
-    return {
-        "user_expertise": [
-            user_expertise_to_json(user_expertise) for user_expertise in user_expertises
-        ]
-    }
-
-
-def user_expertise_to_json(user_expertise: UserExpertise) -> dict:
-    return {
-        "user_id": str(user_expertise.user_id),
-        "name": user_expertise.name,
-        "value": user_expertise.value,
-        "created_at": user_expertise.created_at.isoformat() if user_expertise.created_at else None,
-    }
-
-
 def bookmarks_to_json(bookmarks: List[PostBookmark]) -> dict:
     return {
         "bookmarks": [
@@ -149,5 +134,62 @@ def bookmark_to_json(bookmark: PostBookmark) -> dict:
         "url": settings.APP_HOST + reverse("show_post", kwargs={
             "post_type": bookmark.post.type, "post_slug": bookmark.post.slug
         }),
+        "post_id": str(bookmark.post_id),
         "created_at": bookmark.created_at.isoformat() if bookmark.created_at else None,
+    }
+
+
+def upvotes_to_json(upvotes: List[PostVote]) -> dict:
+    return {
+        "upvotes": [
+            upvote_to_json(upvote) for upvote in upvotes
+        ]
+    }
+
+
+def upvote_to_json(upvote: PostVote) -> dict:
+    return {
+        "url": settings.APP_HOST + reverse("show_post", kwargs={
+            "post_type": upvote.post.type, "post_slug": upvote.post.slug
+        }),
+        "post_id": str(upvote.post_id),
+        "created_at": upvote.created_at.isoformat() if upvote.created_at else None,
+        "title": upvote.post.title,
+    }
+
+
+def badges_to_json(badges: List[UserBadge]) -> dict:
+    return {
+        "badges": [
+            badge_to_json(badge) for badge in badges
+        ]
+    }
+
+
+def badge_to_json(badge: UserBadge) -> dict:
+    return {
+        "badge_id": str(badge.badge_id),
+        "from_user_id": str(badge.from_user_id),
+        "created_at": badge.created_at.isoformat() if badge.created_at else None,
+        "post_id": str(badge.post_id),
+        "comment_id": str(badge.comment_id),
+        "note": badge.note,
+    }
+
+
+def achievements_to_json(achievements: List[UserAchievement]) -> dict:
+    return {
+        "badges": [
+            achievement_to_json(achievement) for achievement in achievements
+        ]
+    }
+
+
+def achievement_to_json(achievement: UserAchievement) -> dict:
+    return {
+        "achievement_id": str(achievement.achievement_id),
+        "achievement_code": achievement.achievement.code,
+        "achievement_name": achievement.achievement.name,
+        "achievement_description": achievement.achievement.description,
+        "created_at": achievement.created_at.isoformat() if achievement.created_at else None,
     }

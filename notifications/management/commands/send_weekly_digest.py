@@ -2,15 +2,15 @@ import base64
 import logging
 from datetime import datetime, timedelta
 
-import requests
 import telegram
 from django.conf import settings
 from django.core.management import BaseCommand
-from django.urls import reverse
 
+from club.exceptions import NotFound
+from notifications.digests import generate_weekly_digest
 from notifications.telegram.common import send_telegram_message, CLUB_CHANNEL, render_html_message
 from landing.models import GodSettings
-from notifications.email.sender import send_club_email
+from notifications.email.sender import send_mass_email
 from posts.models.post import Post
 from search.models import SearchIndex
 from users.models.user import User
@@ -19,29 +19,21 @@ log = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Send weekly digest to subscribers"
+    help = "Send weekly digest"
 
     def add_arguments(self, parser):
         parser.add_argument("--production", nargs=1, type=bool, required=False, default=False)
 
     def handle(self, *args, **options):
         # render digest using a special html endpoint
-        digest_url = "https://vas3k.club" + reverse("render_weekly_digest")
-        self.stdout.write(f"Generating digest: {digest_url}")
-
-        digest_html_response = requests.get(digest_url)
-        if digest_html_response.status_code > 400:
-            log.error("Weekly digest error: bad status code", extra={"html": digest_html_response.text})
+        try:
+            digest_template, _ = generate_weekly_digest()
+        except NotFound:
+            log.error("Weekly digest is empty")
             return
 
-        digest_html = digest_html_response.text
-
-        no_footer_digest_response = requests.get(digest_url, params={"no_footer": 1})
-        if no_footer_digest_response.status_code > 400:
-            log.error("Weekly digest without footer error: bad status code", extra={"html": no_footer_digest_response.text})
-            return
-
-        no_footer_digest_html = no_footer_digest_response.text
+        # get a version without "unsubscribe" footer for posting on home page
+        digest_without_footer, og_description = generate_weekly_digest(no_footer=True)
 
         # save digest as a post
         issue = (datetime.utcnow() - settings.LAUNCH_DATE).days // 7
@@ -52,14 +44,16 @@ class Command(BaseCommand):
             defaults=dict(
                 author=User.objects.filter(slug="vas3k").first(),
                 title=f"Клубный журнал. Итоги недели. Выпуск #{issue}",
-                html=no_footer_digest_html,
-                text=no_footer_digest_html,
+                html=digest_without_footer,
+                text=digest_without_footer,
                 is_pinned_until=datetime.utcnow() + timedelta(days=1),
                 is_visible=True,
                 is_public=False,
+                metadata={"og_description": og_description},
             )
         )
 
+        # make it searchable
         SearchIndex.update_post_index(post)
 
         # sending emails
@@ -67,7 +61,7 @@ class Command(BaseCommand):
             .filter(
                 is_email_verified=True,
                 membership_expires_at__gte=datetime.utcnow() - timedelta(days=14),
-                moderation_status=User.MODERATION_STATUS_APPROVED
+                moderation_status=User.MODERATION_STATUS_APPROVED,
             )\
             .exclude(email_digest_type=User.EMAIL_DIGEST_TYPE_NOPE)\
             .exclude(is_email_unsubscribed=True)
@@ -75,22 +69,22 @@ class Command(BaseCommand):
         for user in subscribed_users:
             self.stdout.write(f"Sending to {user.email}...")
 
-            if not options.get("production") and user.email != "me@vas3k.ru":
-                self.stdout.write("Test mode. Use --production to send the digest to all users")
+            if not options.get("production") and not user.is_god:
                 continue
 
             try:
-                user_digest_html = str(digest_html)
-                user_digest_html = user_digest_html\
+                secret_code = base64.b64encode(user.secret_hash.encode("utf-8")).decode()
+
+                digest = digest_template\
                     .replace("%username%", user.slug)\
                     .replace("%user_id%", str(user.id))\
-                    .replace("%secret_code%", base64.b64encode(user.secret_hash.encode("utf-8")).decode())
+                    .replace("%secret_code%", secret_code)
 
-                send_club_email(
+                send_mass_email(
                     recipient=user.email,
                     subject=f"🤘 Клубный журнал. Итоги недели. Выпуск #{issue}",
-                    html=user_digest_html,
-                    tags=["weekly_digest", f"weekly_digest_{issue}"]
+                    html=digest,
+                    unsubscribe_link=f"{settings.APP_HOST}/notifications/unsubscribe/{user.id}/{secret_code}/"
                 )
             except Exception as ex:
                 self.stdout.write(f"Sending to {user.email} failed: {ex}")
@@ -98,14 +92,15 @@ class Command(BaseCommand):
                 continue
 
         if options.get("production"):
-            # flush digest intro for next time
-            GodSettings.objects.update(digest_intro=None)
+            # flush digest intro and title for next time
+            GodSettings.objects.update(digest_intro=None, digest_title=None)
 
-        send_telegram_message(
-            chat=CLUB_CHANNEL,
-            text=render_html_message("weekly_digest_announce.html", post=post),
-            disable_preview=True,
-            parse_mode=telegram.ParseMode.HTML,
-        )
+            # announce on channel
+            send_telegram_message(
+                chat=CLUB_CHANNEL,
+                text=render_html_message("weekly_digest_announce.html", post=post),
+                disable_preview=False,
+                parse_mode=telegram.ParseMode.HTML,
+            )
 
         self.stdout.write("Done 🥙")

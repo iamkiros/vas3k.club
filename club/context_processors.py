@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from common.data.expertise import EXPERTISE
+from club import features
 
 
 def settings_processor(request):
@@ -9,9 +9,5 @@ def settings_processor(request):
     }
 
 
-def data_processor(request):
-    return {
-        "global_data": {
-            "expertise": EXPERTISE,
-        }
-    }
+def features_processor(request):
+    return {"features": features}

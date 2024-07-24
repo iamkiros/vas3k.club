@@ -1,41 +1,14 @@
 # Advanced Setup
 
-## Telegram bot
-
-To run telegram bot you have to:
-  1. Copy env.exmaple file: `cp ./club/.env.example ./club/.env`
-  2. Fill all the requirement fields in `./club/env`, such as `TELEGRAM_TOKEN` etc.
-      - `TELEGRAM_TOKEN` you can get from [@BotFather](https://t.me/BotFather)
-      - To get `TELEGRAM_CLUB_CHANNEL_URL`, `TELEGRAM_ADMIN_CHAT_ID` etc Just Simply Forward a message from your group/channel to [@JsonDumpBot](https://t.me/JsonDumpBot) or [@getidsbot](https://t.me/getidsbot)
-  3. Rebuild application: `docker-compose up --build`
-
-## Docker-compose
-
-Check out our [docker-compose.yml](https://github.com/vas3k/vas3k.club/blob/master/docker-compose.yml) to understand the infrastructure.
-
 ## Local development
 
 Once you decided to code something in the project you'll need to setup your environment. Here's how you can make it.
 
-### Setup venv
+### Setup pipenv
 
-Through `pipenv` // todo: (у меня с ним было 2 проблемы)
- - сходу не получилось выпилить установку gdal либы (удаление из pipfile и pipfile.locka не помогло), чтобы оно не фейлило установку остальных пакетов
- - не получилось указать папку созданного из консоли pipenv'а в pycharm'е
-
-Through old fashion `virtualenv`:
- - setup your Python Interpreter at PyCharm with `virtualenv`
- - install deps from [requirements.txt](requirements.txt) and [dev_requirements.txt](dev_requirements.txt)
-  ```sh
-  (venv) $ pip install --upgrade -r requirements.txt  
-  (venv) $ pip install --upgrade -r dev_requirements.txt 
-  ```
-
-If you don't need to work with Geo Data and installation of `gdal` package is failed so skip it with next workaround:
-```sh
-# run each line of reqs independently
-(venv) $ cat requirements.txt | xargs -n 1 pip install
-```
+1. Get pipenv: `pip3 install --user pipenv`
+2. Install packages and activate virtual environment: `pipenv install --dev`
+3. Check that it was installed correctly: `pipenv shell`
 
 ### Setup postgres
 
@@ -93,11 +66,54 @@ After you have setup postgres, venv and build frontend (look this steps above) c
 $ docker-compose -f docker-compose.yml up redis
 
 # run queue
-(venv) $ ./manage.py qcluster
+$ pipenv run python manage.py qcluster
 
 # run db migration
-(venv) $ ./manage.py migrate
+$ pipenv run python manage.py migrate
 
 # run dev server
-(venv) $ ./manage.py runserver 0.0.0.0:8000
+$ pipenv run python manage.py runserver 0.0.0.0:8000
+```
+
+## Telegram bot or help-desk-bot
+
+To run telegram bot you have to:
+  1. Copy env.exmaple file: `cp ./club/.env.example ./club/.env`
+  2. Fill all the requirement fields in `./club/.env`, such as `TELEGRAM_TOKEN` etc.
+      - `TELEGRAM_TOKEN` you can get from [@BotFather](https://t.me/BotFather)
+      - To get `TELEGRAM_CLUB_CHANNEL_URL`, `TELEGRAM_ADMIN_CHAT_ID` etc Just Simply Forward a message from your group/channel to [@JsonDumpBot](https://t.me/JsonDumpBot) or [@getidsbot](https://t.me/getidsbot)
+  3. Rebuild application: `docker-compose up --build`
+
+## Docker-compose
+
+Check out our [docker-compose.yml](https://github.com/vas3k/vas3k.club/blob/master/docker-compose.yml) to understand the infrastructure.
+
+## Load posts from main vas3k.club to dev/local database
+
+Sometimes you need fill saome posts/users data from real project. For this case you can use `import_posts_to_dev` command.
+
+Command fetch https://vas3k.club/feed.json and copy `is_public=True` posts to your database:
+```bash
+# fetch first page
+$ python3 manage.py import_posts_to_dev
+
+# fetch first 10 pages
+$ python3 manage.py import_posts_to_dev --pages 10
+
+# fetch 10 pages, starts from page 5
+$ python3 manage.py import_posts_to_dev --pages 10 --skip 5
+
+# fetch 10 pages, starts from page 5 and update exists posts
+$ python3 manage.py import_posts_to_dev --pages 10 --skip 5 --force
+
+# if use docker-compose
+$ docker exec -it club_app python3 manage.py import_posts_to_dev --pages 2
+```
+You can also import private posts and comments, but you will need to create an application (https://vas3k.club/apps/create/) and use `service_token` to do this.
+```bash
+# fetch first page with comments
+$ python3 manage.py import_posts_to_dev --with-comments --service-token XXX
+
+# fetch first page with private posts and comments
+$ python3 manage.py import_posts_to_dev --with-private --with-comments --service-token XXX
 ```

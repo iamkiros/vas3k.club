@@ -4,7 +4,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.db import models
 
-from common.request import parse_ip_address, parse_useragent
+from common.request import parse_ip_address
 from posts.models.post import Post
 from users.models.user import User
 
@@ -16,7 +16,6 @@ class PostVote(models.Model):
     post = models.ForeignKey(Post, related_name="voters", db_index=True, on_delete=models.CASCADE)
 
     ipaddress = models.GenericIPAddressField(null=True)
-    useragent = models.CharField(max_length=512, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -26,7 +25,7 @@ class PostVote(models.Model):
 
     @classmethod
     def upvote(cls, user, post, request=None):
-        if not user.is_god and user.id == post.author_id:
+        if not user.is_god and (user.id == post.author_id or user.slug in post.coauthors):
             return None, False
 
         post_vote, is_vote_created = PostVote.objects.get_or_create(
@@ -34,7 +33,6 @@ class PostVote(models.Model):
             post=post,
             defaults=dict(
                 ipaddress=parse_ip_address(request) if request else None,
-                useragent=parse_useragent(request) if request else None
             )
         )
 
@@ -50,7 +48,7 @@ class PostVote(models.Model):
 
     @classmethod
     def retract_vote(cls, request, user, post):
-        if not user.is_god and user.id == post.author_id:
+        if not user.is_god and (user.id == post.author_id or user.slug in post.coauthors):
             return False
 
         try:

@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.db import models
 
+from payments.exceptions import PaymentNotFound, PaymentAlreadyFinalized
 from users.models.user import User
 
 
@@ -49,13 +50,29 @@ class Payment(models.Model):
     @classmethod
     def finish(cls, reference, status=STATUS_SUCCESS, data=None):
         payment = Payment.get(reference)
-        if payment:
-            payment.status = status
-            if data:
-                payment.data = json.dumps(data)
-            payment.save()
+        if not payment:
+            raise PaymentNotFound()
+
+        if payment.status != cls.STATUS_STARTED and status == cls.STATUS_SUCCESS:
+            raise PaymentAlreadyFinalized()
+
+        payment.status = status
+        if data:
+            payment.data = json.dumps(data)
+        payment.save()
+
         return payment
 
     @classmethod
     def for_user(cls, user):
         return Payment.objects.filter(user=user)
+
+    def invited_user_email(self):
+        # this is hacky, need to use a proper JSON field here
+        if self.data:
+            try:
+                payment_data = json.loads(self.data)
+                return payment_data.get("metadata", {}).get("invite") or payment_data.get("invite")
+            except (KeyError, AttributeError):
+                return None
+        return None

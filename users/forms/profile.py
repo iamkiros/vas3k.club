@@ -1,11 +1,9 @@
 from django import forms
-from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 
 from common.data.countries import COUNTRIES
-from common.data.expertise import EXPERTISE
+from posts.models.post import Post
 from users.models.user import User
-from users.models.expertise import UserExpertise
 from common.forms import ImageUploadField
 
 
@@ -28,7 +26,7 @@ class ProfileEditForm(ModelForm):
     )
     bio = forms.CharField(
         label="Ссылочки на себя и всякое такое",
-        required=False,
+        required=True,
         max_length=1024,
         widget=forms.Textarea(attrs={"maxlength": 1024}),
     )
@@ -42,10 +40,9 @@ class ProfileEditForm(ModelForm):
         required=True,
         max_length=128
     )
-    contact = forms.CharField(
-        label="Контакт для связи",
-        required=True,
-        max_length=256,
+    is_profile_public = forms.BooleanField(
+        label="Сделать мой профиль публичным",
+        required=False,
     )
 
     class Meta:
@@ -57,8 +54,18 @@ class ProfileEditForm(ModelForm):
             "city",
             "country",
             "bio",
-            "contact",
+            "is_profile_public",
         ]
+
+    def clean_is_profile_public(self):
+        new_value = self.cleaned_data["is_profile_public"]
+        old_value = self.instance.is_profile_public
+
+        # update intro post visibility settings
+        if new_value != old_value:
+            Post.objects.filter(author=self.instance, type=Post.TYPE_INTRO).update(is_public=new_value)
+
+        return new_value
 
 
 class NotificationsEditForm(ModelForm):
@@ -75,44 +82,3 @@ class NotificationsEditForm(ModelForm):
         fields = [
             "email_digest_type",
         ]
-
-
-class ExpertiseForm(ModelForm):
-    expertise = forms.ChoiceField(
-        label="Область",
-        required=True,
-        choices=EXPERTISE + [("custom", "[добавить своё]")],
-    )
-    expertise_custom = forms.CharField(
-        label="Свой вариант",
-        required=False,
-        max_length=32
-    )
-    value = forms.IntegerField(
-        label="Скилл",
-        min_value=0,
-        max_value=100,
-        required=True,
-        widget=forms.NumberInput(attrs={"type": "range", "step": "1"}),
-    )
-
-    class Meta:
-        model = UserExpertise
-        fields = ["expertise", "value"]
-
-    def clean(self):
-        super().clean()
-        custom_expertise = self.cleaned_data.get("expertise_custom")
-        if custom_expertise:
-            self.cleaned_data["expertise"] = UserExpertise.make_custom_expertise_slug(custom_expertise)
-
-        if not self.cleaned_data["expertise"]:
-            raise ValidationError("Name is required")
-
-    def save(self, commit=True):
-        instance = super().save(commit=commit)
-        custom_expertise = self.cleaned_data.get("expertise_custom")
-        if custom_expertise:
-            instance.name = custom_expertise
-        return instance
-

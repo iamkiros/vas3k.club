@@ -3,7 +3,13 @@ from django import forms
 from landing.models import GodSettings
 
 
-class GodSettingsEditForm(forms.ModelForm):
+class GodmodeDigestEditForm(forms.ModelForm):
+    digest_title = forms.CharField(
+        label="Заголовок следующего дайджеста",
+        required=False,
+        max_length=200,
+    )
+
     digest_intro = forms.CharField(
         label="Интро к следующему дайджесту",
         required=False,
@@ -16,6 +22,15 @@ class GodSettingsEditForm(forms.ModelForm):
         ),
     )
 
+    class Meta:
+        model = GodSettings
+        fields = [
+            "digest_title",
+            "digest_intro",
+        ]
+
+
+class GodmodeNetworkSettingsEditForm(forms.ModelForm):
     network_page = forms.CharField(
         label="Страница «Сеть»",
         required=False,
@@ -30,6 +45,18 @@ class GodSettingsEditForm(forms.ModelForm):
     class Meta:
         model = GodSettings
         fields = [
-            "digest_intro",
             "network_page",
         ]
+
+
+class GodmodeInviteForm(forms.Form):
+    email = forms.EmailField(
+        label="E-mail",
+        required=True,
+    )
+
+    days = forms.IntegerField(
+        label="Дней",
+        required=True,
+        initial=365,
+    )

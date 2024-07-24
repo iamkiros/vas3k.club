@@ -18,7 +18,10 @@ module.exports = {
         library: "Club",
     },
     plugins: [
-        new BundleTracker(),
+        new BundleTracker({
+            path: __dirname,
+            filename: "webpack-stats.json",
+        }),
         new MiniCssExtractPlugin({
             filename: mode === "production" ? "[name]-[hash].css": "[name].css",
             chunkFilename: "[id].css",
@@ -59,7 +62,7 @@ module.exports = {
     resolve: {
         alias: {
             vue: mode === "production" ? "vue/dist/vue.min.js" : "vue/dist/vue.js",
-            "vue-mapbox": "vue-mapbox/dist/vue-mapbox.umd.min.js",
+            "vue-mapbox-ho": "vue-mapbox-ho/dist/vue-mapbox.min.js",
         }
     }
 };

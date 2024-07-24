@@ -2,13 +2,14 @@ from django.conf import settings
 from django.db.models import Value
 from django.db.models.functions import Replace
 
-from auth.models import Session, Code
+from authn.models.session import Session, Code
 from bookmarks.models import PostBookmark
 from comments.models import Comment
 from posts.models.post import Post
 from users.models.achievements import UserAchievement
-from users.models.expertise import UserExpertise
-from users.models.tags import UserTag
+from users.models.friends import Friend
+from users.models.mute import Muted
+from tags.models import UserTag
 from users.models.user import User
 from utils.strings import random_string
 
@@ -47,6 +48,15 @@ def delete_user_data(user: User):
     # delete draft and unpublished posts
     Post.objects.filter(author=user, is_visible=False).delete()
 
+    # remove user from coauthors
+    posts = Post.objects.filter(coauthors__contains=[old_slug])
+    for post in posts:
+        try:
+            post.coauthors.remove(old_slug)
+            post.save()
+        except ValueError:
+            pass
+
     # transfer visible post ownership to "@deleted" user
     deleted_user = User.objects.filter(slug=settings.DELETED_USERNAME).first()
     if deleted_user:
@@ -64,7 +74,10 @@ def delete_user_data(user: User):
     # drop related data
     UserAchievement.objects.filter(user=user).delete()
     UserTag.objects.filter(user=user).delete()
-    UserExpertise.objects.filter(user=user).delete()
     Session.objects.filter(user=user).delete()
     Code.objects.filter(user=user).delete()
     PostBookmark.objects.filter(user=user).delete()
+    Friend.objects.filter(user_from=user).delete()
+    Friend.objects.filter(user_to=user).delete()
+    Muted.objects.filter(user_from=user).delete()
+    Muted.objects.filter(user_to=user).delete()

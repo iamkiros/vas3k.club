@@ -5,8 +5,7 @@ import uuid
 
 import django
 from django.urls import reverse
-from django.conf import settings
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 import json
 import time
 import yaml
@@ -15,11 +14,13 @@ from unittest.mock import patch
 
 from stripe.webhook import WebhookSignature
 
+import authn.models.session
+
 django.setup()  # todo: how to run tests from PyCharm without this workaround?
 
 from payments.models import Payment
 from payments.products import PRODUCTS
-from tests.helpers import HelperClient
+from debug.helpers import HelperClient
 from users.models.user import User
 
 
@@ -106,7 +107,7 @@ class TestDoneView(TestCase):
         self.assertContains(response=response, text="Теперь у вас есть аккаунт в Клубе", status_code=200)
 
 
-@patch('payments.views.stripe')
+@patch('payments.views.stripe.stripe')
 class TestPayView(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -143,8 +144,7 @@ class TestPayView(TestCase):
         self.assertEqual(created_user.membership_platform_type, User.MEMBERSHIP_PLATFORM_DIRECT)
         self.assertEqual(created_user.full_name, email.replace("@email.com", ""))
         self.assertAlmostEquals(created_user.membership_started_at, datetime.utcnow(), delta=timedelta(seconds=5))
-        self.assertAlmostEquals(created_user.membership_expires_at, datetime.utcnow() + timedelta(days=1),
-                                delta=timedelta(seconds=5))
+        self.assertAlmostEquals(created_user.membership_expires_at, datetime.utcnow(), delta=timedelta(seconds=5))
         self.assertEqual(created_user.moderation_status, User.MODERATION_STATUS_INTRO)
 
         self.assertTrue(Payment.get(reference=session.id))
